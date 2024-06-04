@@ -6,7 +6,7 @@ import torch.nn.utils.parametrizations as PT
 from utils import Sphere,CustomDataset,CustomDataLoader
 from torch.utils.data import DataLoader
 
-def cost_func_confusion_matrix(X:torch.Tensor, y:torch.Tensor):
+def cost_func_confusion_matrix(X:torch.Tensor, y:torch.Tensor,sim_metric='cos'):
     '''
     This cost function compute the mean of element-wise L2 distance of two similarity matrices.
     :param X: low D embedding matrix. (n_sample x n_feature)
@@ -19,14 +19,21 @@ def cost_func_confusion_matrix(X:torch.Tensor, y:torch.Tensor):
     # normalize X
     X=X/X.norm(dim=-1, keepdim=True)
 
-    # compute the similarity matrix
-    similarity_matrix = torch.mm(X, X.t())
-
+    if sim_metric=='cos':
+        # compute the similarity matrix
+        similarity_matrix = torch.mm(X, X.t())
+    elif sim_metric=='corr':
+        pass
+    elif sim_metric=='l2':
+        # for this method: for each trial, we calculate the 1-L2/l2_random
+        pass
+        # TODO
     # compute the sum of element-wise L2 distance
     distance=torch.sum((similarity_matrix-y)**2)
 
     # return the mean of the distance
     return distance/X.size(0)**2
+
 
 class AlignPhonemeNet(nn.Module):
     def __init__(self, n_features, n_low_D):
