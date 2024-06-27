@@ -117,7 +117,7 @@ def reformat(data, bins_per_feature):
 
 
 def get_raw(date, band):
-    data_path = f'../Bolu_IFG/processed_data/{band}_power/{date}_all_blocks.mat'
+    data_path = f'../Speech Data/Analysis/2000Hz/{band}_power/{date}_all_blocks.mat'
     try:
         raw_data_ = pd.DataFrame(sio.loadmat(data_path)['all_data'])
     except:
@@ -130,19 +130,19 @@ def data_cleaning(data: pd.DataFrame, channel_cleaning_threshold=1, trial_cleani
     # channel cleaning comes first before trial cleaning
     # threshold get multiplied to the standard deviation
     # here we assume the standard deviation of each pre-zscored channel is stored in the raw data
-    all_data = data[1].to_list()
+    all_data = data[0].to_list()
     ## channel cleaning
     channel_std = data[0].to_list()[0]
-    channel_std_std = channel_std.std()
-    reject_channels = np.where(channel_std > channel_cleaning_threshold * channel_std_std)[0]
+    channel_std_mean = channel_std.mean()
+    reject_channels = np.where(channel_std > channel_cleaning_threshold * channel_std_mean)[0]
     channel_clean_data = [np.delete(a, reject_channels, axis=0) for a in all_data]
     ## trial cleaning
-    trial_std = np.array([t.mean(axis=0).std() for t in channel_clean_data])
-    reject_trials = np.where(trial_std > trial_cleaning_threshold * trial_std.std())[0]
+    trial_mean = np.array([t.mean(axis=0).mean() for t in channel_clean_data])
+    reject_trials = np.where(trial_mean > trial_cleaning_threshold * trial_mean.std())[0]
 
     data = data.drop(data.index[reject_trials])
 
-    return data, reject_channels, reject_trials, channel_std, trial_std
+    return data, reject_channels, reject_trials, channel_std, trial_mean
 
 
 def get_phoneme_embeddings(word):

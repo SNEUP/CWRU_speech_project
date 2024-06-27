@@ -22,17 +22,31 @@ def cost_func_confusion_matrix(X:torch.Tensor, y:torch.Tensor,sim_metric='cos'):
     if sim_metric=='cos':
         # compute the similarity matrix
         similarity_matrix = torch.mm(X, X.t())
+        # similarity_matrix = torch.nn.functional.cosine_similarity(X,X) # this did not reproduce the result as expected
     elif sim_metric=='corr':
-        pass
+        similarity_matrix = torch.corrcoef(X)
+        
     elif sim_metric=='l2':
         # for this method: for each trial, we calculate the 1-L2/l2_random
         pass
         # TODO
     # compute the sum of element-wise L2 distance
-    distance=torch.sum((similarity_matrix-y)**2)
+    # distance=torch.sum((similarity_matrix-y)**2)
+    # print("this is the size of sim matrix",similarity_matrix.size())
+    # print("This is the size of y",y.size())
+    correlations = []
+    for i in range(similarity_matrix.size(1)):
+        vx = similarity_matrix[:, i] - torch.mean(similarity_matrix[:, i])
+        vy = y[:, i] - torch.mean(y[:, i])
+        cost = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)))
+        correlations.append(cost)
+    avg_correlation = torch.mean(torch.stack(correlations))
+    # print("this is the average correlation size",avg_correlation.size())
+    
+    return 1 - avg_correlation  # 1 - correlation because we want to maximize correlation
 
     # return the mean of the distance
-    return distance/X.size(0)**2
+    # return distance/X.size(0)**2
 
 
 class AlignPhonemeNet(nn.Module):
@@ -67,7 +81,7 @@ class AlignPhonemeNet(nn.Module):
 
     def fit(self, X:np.ndarray,Y:np.ndarray,
             X_val=None, Y_val=None,
-            num_iterations=500, learning_rate=0.01, lambda_l1=0.001,device='cpu'):
+            num_iterations=500, learning_rate=0.01, lambda_l1=0.001,device='cpu',similarity_metric='cos'):
         '''
         :param X: the high dimensional data. (n_sample x n_features)
         :param Y: the corresponding similarity matrix. (n_sample x n_sample)
@@ -98,7 +112,7 @@ class AlignPhonemeNet(nn.Module):
             X_embed = self.forward(X)
 
             # calculate the loss: similarity loss + l1 penalty
-            loss=cost_func_confusion_matrix(X_embed,Y)
+            loss = cost_func_confusion_matrix(X_embed,Y,similarity_metric)
             l1_reg = lambda_l1 * torch.norm(self.linear_X.weight, p=1)
             loss += l1_reg
             self.training_loss.append(loss.item())
@@ -109,8 +123,8 @@ class AlignPhonemeNet(nn.Module):
             # if there is a validation set. This is to determine if the model is overfitting
             if X_val is not None:
                 with torch.no_grad():
-                    X_test_embed= self.forward(X_val)
-                    loss_test=cost_func_confusion_matrix(X_test_embed,Y_val)
+                    X_test_embed = self.forward(X_val)
+                    loss_test = cost_func_confusion_matrix(X_test_embed,Y_val)
                     l1_reg = lambda_l1 * torch.norm(self.linear_X.weight, p=1)
                     loss_test += l1_reg
                     self.validation_loss.append(loss_test.item())
